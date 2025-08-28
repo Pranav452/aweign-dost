@@ -40,10 +40,21 @@ function extractSkills(texts: Array<string | null | undefined>): string[] {
   return Array.from(found).sort();
 }
 
-async function runLinkedInQuery(input: QueryInput) {
+type FetchedJob = {
+  title?: string;
+  company?: string;
+  location?: string;
+  link?: string;
+  postedDate?: string;
+  description?: string;
+};
+
+async function runLinkedInQuery(input: QueryInput): Promise<Array<{
+  title: string; company: string; location: string; jobUrl: string; date: string | null; description: string;
+}>> {
   // Import the service function directly from the package's ESM source to avoid starting its server
-  const { fetchJobListings }: any = await import('@atharvh01/linkedin-jobs-api/src/services/linkedinService.js');
-  const results: any[] = await fetchJobListings(
+  const mod: { fetchJobListings: (keywords: string, location: string, dateSincePosted?: string) => Promise<FetchedJob[]> } = await import('@atharvh01/linkedin-jobs-api/src/services/linkedinService.js');
+  const results: FetchedJob[] = await mod.fetchJobListings(
     input.keywords ?? '',
     input.location ?? '',
     input.dateSincePosted ?? ''
@@ -85,10 +96,11 @@ export async function POST(request: NextRequest) {
       count: normalized.length,
       jobs: normalized
     }), { status: 200, headers: { 'content-type': 'application/json' } });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = typeof error === 'object' && error && 'message' in error ? String((error as { message?: unknown }).message) : 'Internal error';
     return new Response(JSON.stringify({
       success: false,
-      error: { message: error?.message || 'Internal error' }
+      error: { message }
     }), { status: 500, headers: { 'content-type': 'application/json' } });
   }
 }
